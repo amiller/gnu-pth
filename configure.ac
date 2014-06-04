@@ -694,3 +694,4 @@ if test ".$enable_batch" != .yes; then
     echo ""
 fi
 
+AC_CONFIG_MACRO_DIR([m4])

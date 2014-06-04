@@ -590,6 +590,7 @@ int pth_fdmode(int fd, int newmode)
         oldmode = PTH_FDMODE_NONBLOCK;
     else
         oldmode = PTH_FDMODE_BLOCK;
+    pth_debug2("pth_fdmode: oldmode:%d", oldmode);
 
     /* set new mode (usually a more expensive operation) */
     if (oldmode == PTH_FDMODE_BLOCK && newmode == PTH_FDMODE_NONBLOCK)

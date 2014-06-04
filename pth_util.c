@@ -94,8 +94,8 @@ intern char *pth_util_cpystrn(char *dst, const char *src, size_t dst_size)
 /* check whether a file-descriptor is valid */
 intern int pth_util_fd_valid(int fd)
 {
-    if (fd < 0 || fd >= FD_SETSIZE)
-        return FALSE;
+  //if (fd < 0 || fd >= FD_SETSIZE)
+  //    return FALSE;
     if (fcntl(fd, F_GETFL) == -1 && errno == EBADF)
         return FALSE;
     return TRUE;
@@ -182,3 +182,45 @@ intern int pth_util_fds_select(int nfd,
     return n;
 }
 
+intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval *timeout) {
+#ifdef USE_EPOLL
+  register int s;
+  int epd = epoll_create1(0);
+  int rc;
+  for (s = 0; s < nfds; s++) {
+    struct epoll_event evt = {0};
+    evt.data.fd = s;
+    if (rfds != NULL)
+      if (FD_ISSET(s, rfds)) evt.events |= EPOLLIN;
+    if (wfds != NULL)
+      if (FD_ISSET(s, wfds)) evt.events |= EPOLLOUT;
+    if (efds != NULL)
+      if (FD_ISSET(s, efds)) evt.events |= EPOLLRDHUP;
+    if (evt.events) epoll_ctl(epd, EPOLL_CTL_ADD, s, &evt);
+  }
+  struct epoll_event events[FD_SETSIZE*3];
+  int msdelay;
+  if (timeout) msdelay = timeout->tv_sec*1000 + (timeout->tv_usec+999)/1000;
+  else msdelay = -1;
+  printf("about to epoll\n");
+  while ((rc = epoll_wait(epd, events, FD_SETSIZE*3, msdelay)) < 0
+	 && errno == EINTR)
+  if (rfds != NULL) FD_ZERO(rfds);
+  if (wfds != NULL) FD_ZERO(wfds);
+  if (efds != NULL) FD_ZERO(efds);
+  int i;
+  printf("epoll waited:%dms and returned:%d errno:%s\n", msdelay, rc, strerror(errno));
+  for (i = 0; i < rc; i++) {
+    if (rfds != NULL && events[i].events & EPOLLIN)
+      FD_SET(events[i].data.fd, rfds);
+    if (wfds != NULL && events[i].events & EPOLLOUT)
+      FD_SET(events[i].data.fd, wfds);
+    if (efds != NULL && events[i].events & EPOLLRDHUP)
+      FD_SET(events[i].data.fd, efds);
+  }
+  close(epd);
+  return rc;
+#else
+  return pth_sc(select)(nfds, rfds, wfds, efds, timeout);
+#endif
+}

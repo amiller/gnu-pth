@@ -483,11 +483,15 @@ intern int pth_sc_select(int nfds, fd_set *readfds, fd_set *writefds,
                          fd_set *exceptfds, struct timeval *timeout)
 {
     /* internal exit point for Pth */
+    printf("internal\n");
     if (pth_syscall_fct_tab[PTH_SCF_select].addr != NULL)
         return ((int (*)(int, fd_set *, fd_set *, fd_set *, struct timeval *))
                pth_syscall_fct_tab[PTH_SCF_select].addr)
                (nfds, readfds, writefds, exceptfds, timeout);
-#if defined(HAVE_SYSCALL) && defined(SYS__newselect) /* Linux */
+    printf("whoa\n");
+#if defined(USE_EPOLL)
+    printf();
+#elif defined(HAVE_SYSCALL) && defined(SYS__newselect) /* Linux */
     else return (int)syscall(SYS__newselect, nfds, readfds, writefds, exceptfds, timeout);
 #elif defined(HAVE_SYSCALL) && defined(SYS_select)
     else return (int)syscall(SYS_select, nfds, readfds, writefds, exceptfds, timeout);

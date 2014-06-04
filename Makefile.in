@@ -59,7 +59,7 @@ LDFLAGS     = @LDFLAGS@
 MKFLAGS     = $(MFLAGS) DESTDIR=$(DESTDIR)
 LIBS        = @LIBS@
 SHTOOL      = $(srcdir)/shtool
-LIBTOOL     = $(C)libtool
+LIBTOOL     = libtool --tag=CC
 RM          = rm -f
 RMDIR       = rmdir
 TRUE        = true

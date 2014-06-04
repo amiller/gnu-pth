@@ -317,7 +317,7 @@ int pth_select_ev(int nfd, fd_set *rfds, fd_set *wfds,
     if (nfd == 0 && rfds == NULL && wfds == NULL && efds == NULL && timeout != NULL) {
         if (timeout->tv_sec == 0 && timeout->tv_usec <= 10000 /* 1/100 second */) {
             /* very small delays are acceptable to be performed directly */
-            while (   pth_sc(select)(0, NULL, NULL, NULL, timeout) < 0
+            while (   pth_util_select(0, NULL, NULL, NULL, timeout) < 0
                    && errno == EINTR) ;
         }
         else {
@@ -362,7 +362,7 @@ int pth_select_ev(int nfd, fd_set *rfds, fd_set *wfds,
         memcpy(&espare, efds, sizeof(fd_set));
         etmp = &espare;
     }
-    while ((rc = pth_sc(select)(nfd, rtmp, wtmp, etmp, &delay)) < 0
+    while ((rc = pth_util_select(nfd, rtmp, wtmp, etmp, &delay)) < 0
            && errno == EINTR)
         ;
     if (rc < 0)
@@ -662,6 +662,8 @@ int pth_accept_ev(int s, struct sockaddr *addr, socklen_t *addrlen, pth_event_t 
     pth_implicit_init();
     pth_debug2("pth_accept_ev: enter from thread \"%s\"", pth_current->name);
 
+    pth_debug2("Accepting from: %d", s);
+
     /* POSIX compliance */
     if (!pth_util_fd_valid(s))
         return pth_error(-1, EBADF);
@@ -669,12 +671,14 @@ int pth_accept_ev(int s, struct sockaddr *addr, socklen_t *addrlen, pth_event_t 
     /* force filedescriptor into non-blocking mode */
     if ((fdmode = pth_fdmode(s, PTH_FDMODE_NONBLOCK)) == PTH_FDMODE_ERROR)
         return pth_error(-1, EBADF);
-
+    pth_debug2("pth_accept_ev: a", 0);
     /* poll socket via accept */
     ev = NULL;
+
     while ((rv = pth_sc(accept)(s, addr, addrlen)) == -1
            && (errno == EAGAIN || errno == EWOULDBLOCK)
            && fdmode != PTH_FDMODE_NONBLOCK) {
+	pth_debug2("pth_accept_ev: accept had errno:%s", strerror(errno));
         /* do lazy event allocation */
         if (ev == NULL) {
             if ((ev = pth_event(PTH_EVENT_FD|PTH_UNTIL_FD_READABLE|PTH_MODE_STATIC, &ev_key, s)) == NULL)
@@ -683,7 +687,9 @@ int pth_accept_ev(int s, struct sockaddr *addr, socklen_t *addrlen, pth_event_t 
                 pth_event_concat(ev, ev_extra, NULL);
         }
         /* wait until accept has a chance */
+	pth_debug2("pth_accept_ev: about to wait errno:%s", strerror(errno));
         pth_wait(ev);
+	pth_debug2("waiting done",0);
         /* check for the extra events */
         if (ev_extra != NULL) {
             pth_event_isolate(ev);
@@ -693,6 +699,7 @@ int pth_accept_ev(int s, struct sockaddr *addr, socklen_t *addrlen, pth_event_t 
             }
         }
     }
+    pth_debug2("pth_accept_ev: b", 0);
 
     /* restore filedescriptor mode */
     pth_shield {
@@ -744,7 +751,7 @@ ssize_t pth_read_ev(int fd, void *buf, size_t nbytes, pth_event_t ev_extra)
         FD_SET(fd, &fds);
         delay.tv_sec  = 0;
         delay.tv_usec = 0;
-        while ((n = pth_sc(select)(fd+1, &fds, NULL, NULL, &delay)) < 0
+        while ((n = pth_util_select(fd+1, &fds, NULL, NULL, &delay)) < 0
                && errno == EINTR) ;
         if (n < 0 && (errno == EINVAL || errno == EBADF))
             return pth_error(-1, errno);
@@ -817,7 +824,7 @@ ssize_t pth_write_ev(int fd, const void *buf, size_t nbytes, pth_event_t ev_extr
         FD_SET(fd, &fds);
         delay.tv_sec  = 0;
         delay.tv_usec = 0;
-        while ((n = pth_sc(select)(fd+1, NULL, &fds, NULL, &delay)) < 0
+        while ((n = pth_util_select(fd+1, NULL, &fds, NULL, &delay)) < 0
                && errno == EINTR) ;
         if (n < 0 && (errno == EINVAL || errno == EBADF))
             return pth_error(-1, errno);
@@ -916,7 +923,7 @@ ssize_t pth_readv_ev(int fd, const struct iovec *iov, int iovcnt, pth_event_t ev
         FD_SET(fd, &fds);
         delay.tv_sec  = 0;
         delay.tv_usec = 0;
-        while ((n = pth_sc(select)(fd+1, &fds, NULL, NULL, &delay)) < 0
+        while ((n = pth_util_select(fd+1, &fds, NULL, NULL, &delay)) < 0
                && errno == EINTR) ;
 
         /* if filedescriptor is still not readable,
@@ -1061,7 +1068,7 @@ ssize_t pth_writev_ev(int fd, const struct iovec *iov, int iovcnt, pth_event_t e
         FD_SET(fd, &fds);
         delay.tv_sec  = 0;
         delay.tv_usec = 0;
-        while ((n = pth_sc(select)(fd+1, NULL, &fds, NULL, &delay)) < 0
+        while ((n = pth_util_select(fd+1, NULL, &fds, NULL, &delay)) < 0
                && errno == EINTR) ;
 
         for (;;) {
@@ -1347,7 +1354,7 @@ ssize_t pth_recvfrom_ev(int fd, void *buf, size_t nbytes, int flags, struct sock
         FD_SET(fd, &fds);
         delay.tv_sec  = 0;
         delay.tv_usec = 0;
-        while ((n = pth_sc(select)(fd+1, &fds, NULL, NULL, &delay)) < 0
+        while ((n = pth_util_select(fd+1, &fds, NULL, NULL, &delay)) < 0
                && errno == EINTR) ;
         if (n < 0 && (errno == EINVAL || errno == EBADF))
             return pth_error(-1, errno);
@@ -1436,7 +1443,7 @@ ssize_t pth_sendto_ev(int fd, const void *buf, size_t nbytes, int flags, const s
         FD_SET(fd, &fds);
         delay.tv_sec  = 0;
         delay.tv_usec = 0;
-        while ((n = pth_sc(select)(fd+1, NULL, &fds, NULL, &delay)) < 0
+        while ((n = pth_util_select(fd+1, NULL, &fds, NULL, &delay)) < 0
                && errno == EINTR) ;
         if (n < 0 && (errno == EINVAL || errno == EBADF))
             return pth_error(-1, errno);
