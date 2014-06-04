@@ -15,6 +15,9 @@
 /* Define to 1 if you have the <dmalloc.h> header file. */
 #undef HAVE_DMALLOC_H
 
+/* This platform supports epoll(7). */
+#undef HAVE_EPOLL
+
 /* Define to 1 if you have the <errno.h> header file. */
 #undef HAVE_ERRNO_H
 
@@ -194,6 +197,9 @@
 /* Define to 1 if you have the `syscall' function. */
 #undef HAVE_SYSCALL
 
+/* Define to 1 if you have the <sys/epoll.h> header file. */
+#undef HAVE_SYS_EPOLL_H
+
 /* define if pre-processor define SYS_read exists in header sys/syscall.h */
 #undef HAVE_SYS_READ
 
@@ -254,6 +260,9 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -286,3 +295,6 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* define if using epoll instead of select */
+#undef USE_EPOLL

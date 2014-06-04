@@ -1627,3 +1627,129 @@ AC_MSG_VERBOSE([$]$2)
 AC_MSG_VERBOSE([$]$3)
 ])
 
+
+
+AC_DEFUN([AX_CONFIG_FEATURE],[ dnl
+m4_pushdef([FEATURE], patsubst([$1], -, _))dnl
+
+AC_ARG_ENABLE([$1],AS_HELP_STRING([--enable-$1],[$2]),[
+case "${enableval}" in
+   yes)
+     ax_config_feature_[]FEATURE[]="yes"
+     ;;
+   no)
+     ax_config_feature_[]FEATURE[]="no"
+     ;;
+   *)
+     AC_MSG_ERROR([bad value ${enableval} for feature --$1])
+     ;;
+esac
+])
+
+AS_IF([test "$ax_config_feature_[]FEATURE[]" = yes],[ dnl
+  AC_DEFINE([$3])
+  $5
+  AS_IF([test "$ax_config_feature_verbose" = yes],[ dnl
+    AC_MSG_NOTICE([Feature $1 is enabled])
+  ])
+],[ dnl
+  $6
+  AS_IF([test "$ax_config_feature_verbose" = yes],[ dnl
+    AC_MSG_NOTICE([Feature $1 is disabled])
+  ])
+])
+
+AH_TEMPLATE([$3],[$4])
+
+m4_popdef([FEATURE])dnl
+])
+
+dnl Feature global
+AC_DEFUN([AX_CONFIG_FEATURE_VERBOSE],[ dnl
+  ax_config_feature_verbose=yes
+])
+
+dnl Feature global
+AC_DEFUN([AX_CONFIG_FEATURE_SILENT],[ dnl
+  ax_config_feature_verbose=no
+])
+
+dnl Feature specific
+AC_DEFUN([AX_CONFIG_FEATURE_DEFAULT_ENABLED], [
+  ax_config_feature_[]FEATURE[]_default=yes
+])
+
+dnl Feature specific
+AC_DEFUN([AX_CONFIG_FEATURE_DEFAULT_DISABLED], [
+  ax_config_feature_[]FEATURE[]_default=no
+])
+
+dnl Feature specific
+AC_DEFUN([AX_CONFIG_FEATURE_ENABLE],[ dnl
+  ax_config_feature_[]patsubst([$1], -, _)[]=yes
+])
+
+dnl Feature specific
+AC_DEFUN([AX_CONFIG_FEATURE_DISABLE],[ dnl
+  ax_config_feature_[]patsubst([$1], -, _)[]=no
+])
+
+
+AC_DEFUN([AX_HAVE_EPOLL], [dnl
+  ax_have_epoll_cppflags="${CPPFLAGS}"
+  AC_CHECK_HEADER([linux/version.h], [CPPFLAGS="${CPPFLAGS} -DHAVE_LINUX_VERSION_H"])
+  AC_MSG_CHECKING([for Linux epoll(7) interface])
+  AC_CACHE_VAL([ax_cv_have_epoll], [dnl
+    AC_LINK_IFELSE([dnl
+      AC_LANG_PROGRAM([dnl
+#include <sys/epoll.h>
+#ifdef HAVE_LINUX_VERSION_H
+#  include <linux/version.h>
+#  if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,45)
+#    error linux kernel version is too old to have epoll
+#  endif
+#endif
+], [dnl
+int fd, rc;
+struct epoll_event ev;
+fd = epoll_create(128);
+rc = epoll_wait(fd, &ev, 1, 0);])],
+      [ax_cv_have_epoll=yes],
+      [ax_cv_have_epoll=no])])
+  CPPFLAGS="${ax_have_epoll_cppflags}"
+  AS_IF([test "${ax_cv_have_epoll}" = "yes"],
+    [AC_MSG_RESULT([yes])
+$1],[AC_MSG_RESULT([no])
+$2])
+])dnl
+
+AC_DEFUN([AX_HAVE_EPOLL_PWAIT], [dnl
+  ax_have_epoll_cppflags="${CPPFLAGS}"
+  AC_CHECK_HEADER([linux/version.h],
+    [CPPFLAGS="${CPPFLAGS} -DHAVE_LINUX_VERSION_H"])
+  AC_MSG_CHECKING([for Linux epoll(7) interface with signals extension])
+  AC_CACHE_VAL([ax_cv_have_epoll_pwait], [dnl
+    AC_LINK_IFELSE([dnl
+      AC_LANG_PROGRAM([dnl
+#ifdef HAVE_LINUX_VERSION_H
+#  include <linux/version.h>
+#  if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+#    error linux kernel version is too old to have epoll_pwait
+#  endif
+#endif
+#include <sys/epoll.h>
+#include <signal.h>
+], [dnl
+int fd, rc;
+struct epoll_event ev;
+fd = epoll_create(128);
+rc = epoll_wait(fd, &ev, 1, 0);
+rc = epoll_pwait(fd, &ev, 1, 0, (sigset_t const *)(0));])],
+      [ax_cv_have_epoll_pwait=yes],
+      [ax_cv_have_epoll_pwait=no])])
+  CPPFLAGS="${ax_have_epoll_cppflags}"
+  AS_IF([test "${ax_cv_have_epoll_pwait}" = "yes"],
+    [AC_MSG_RESULT([yes])
+$1],[AC_MSG_RESULT([no])
+$2])
+])dnl

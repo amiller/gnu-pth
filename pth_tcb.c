@@ -84,6 +84,11 @@ struct pth_st {
     /* per-thread exception handling */
     ex_ctx_t       ex_ctx;               /* exception handling context                  */
 #endif
+
+#ifdef USE_EPOLL
+	int            epoll_fd;             /* epoll descriptor for waiting thread         */
+#endif
+
 };
 
 #endif /* cpp */

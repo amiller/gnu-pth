@@ -320,6 +320,15 @@ dnl # check for 64-bit types (for pth_snprintf.c)
 AC_CHECK_LONGLONG
 AC_CHECK_LONGDOUBLE
 
+dnl # check for epoll
+AX_HAVE_EPOLL(
+  [AX_CONFIG_FEATURE_ENABLE(epoll)],
+  [AX_CONFIG_FEATURE_DISABLE(epoll)])
+AX_CONFIG_FEATURE(
+  [epoll], [This platform supports epoll(7)],
+  [HAVE_EPOLL], [This platform supports epoll(7).])
+
+
 dnl ##
 dnl ##  MACHINE CONTEXT IMPLEMENTATION
 dnl ##
@@ -564,10 +573,28 @@ dnl ##
 dnl ##  BUILD PARAMETERS
 dnl ##
 
+
 AC_MSG_PART(Build Parameters)
 
 dnl #  check for various build parameters
 AC_CHECK_BUILDPARAM
+
+dnl #  whether to build epoll version
+AC_MSG_CHECKING(whether to use epoll instead of select)
+AC_ARG_ENABLE(epoll,dnl
+[  --enable-epoll        build epoll version (default=no)],
+enable_epoll="$enableval",
+if test ".$enable_epoll" = .; then
+    enable_epoll=no
+fi
+)dnl
+AC_MSG_RESULT([$enable_epoll])
+if test ".$enable_epoll" = .yes; then
+  AC_CHECK_HEADERS(sys/epoll.h, 
+   [AC_DEFINE(USE_EPOLL, 1, [define if using epoll instead of select])],
+   [AC_MSG_ERROR([Couldn't find sys/epoll.h])]
+  )
+fi
 
 dnl #  whether to build Pthread library
 AC_MSG_CHECKING(whether to build Pthread library)

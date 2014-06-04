@@ -68,6 +68,12 @@
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
 #endif
+#ifdef USE_EPOLL
+#include <sys/epoll.h>
+#else
+#error "(no epoll?!)"
+#endif
+
 
 /* dmalloc support */
 #ifdef PTH_DMALLOC

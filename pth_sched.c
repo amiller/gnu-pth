@@ -38,6 +38,9 @@ intern pth_pqueue_t pth_DQ;         /* queue of terminated threads           */
 intern int          pth_favournew;  /* favour new threads on startup         */
 intern float        pth_loadval;    /* average scheduler load value          */
 
+intern int          pth_ed;         /* main epoll descriptor                 */
+
+
 static int          pth_sigpipe[2]; /* internal signal occurrence pipe       */
 static sigset_t     pth_sigpending; /* mask of pending signals               */
 static sigset_t     pth_sigblock;   /* mask of signals we block in scheduler */
@@ -75,6 +78,11 @@ intern int pth_scheduler_init(void)
     /* initialize load support */
     pth_loadval = 1.0;
     pth_time_set(&pth_loadticknext, PTH_TIME_NOW);
+
+#ifdef USE_EPOLL    
+    /* initialize the epoll file descriptor */
+    pth_ed = epoll_create1(0);
+#endif
 
     return TRUE;
 }
@@ -621,9 +629,38 @@ intern void pth_sched_eventmanager(pth_time_t *now, int dopoll)
     /* now do the polling for filedescriptor I/O and timers
        WHEN THE SCHEDULER SLEEPS AT ALL, THEN HERE!! */
     rc = -1;
-    if (!(dopoll && fdmax == -1))
-        while ((rc = pth_sc(select)(fdmax+1, &rfds, &wfds, &efds, pdelay)) < 0
-               && errno == EINTR) ;
+    if (!(dopoll && fdmax == -1)) {
+#ifdef USE_EPOLL
+      register int s;
+      for (s = 0; s < fdmax+1; s++) {
+	struct epoll_event evt = {0};
+	epoll_ctl(pth_ed, EPOLL_CTL_DEL, s, &evt);
+	if (FD_ISSET(s, &rfds)) evt.events |= EPOLLIN;
+	if (FD_ISSET(s, &wfds)) evt.events |= EPOLLOUT;
+	if (FD_ISSET(s, &efds)) evt.events |= EPOLLRDHUP;
+	if (evt.events) epoll_ctl(pth_ed, EPOLL_CTL_ADD, s, &evt);
+      }
+      struct epoll_event events[FD_SETSIZE*3];
+      int msdelay;
+      if (pdelay) msdelay = pdelay->tv_sec*1000 + (pdelay->tv_usec+999)/1000;
+      else msdelay = -1;
+      while ((rc = epoll_wait(pth_ed, events, FD_SETSIZE*3, msdelay)) < 0
+	     && errno == EINTR) ;
+      FD_ZERO(&rfds);
+      FD_ZERO(&wfds);
+      FD_ZERO(&efds);
+      int i;
+      printf("epoll waited:%dms and returned:%d errno:%s\n", msdelay, rc, strerror(errno));
+      for (i = 0; i < rc; i++) {
+	if (events[i].events & EPOLLIN)    FD_SET(events[i].data.fd, &rfds);
+	if (events[i].events & EPOLLOUT)   FD_SET(events[i].data.fd, &wfds);
+	if (events[i].events & EPOLLRDHUP) FD_SET(events[i].data.fd, &efds);
+      }
+#else
+      while ((rc = pth_sc(select)(fdmax+1, &rfds, &wfds, &efds, pdelay)) < 0
+	     && errno == EINTR) ;
+#endif
+    }
 
     /* restore signal mask and actions and handle signals */
     pth_sc(sigprocmask)(SIG_SETMASK, &oss, NULL);
