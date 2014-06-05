@@ -207,6 +207,84 @@ long pth_ctrl(unsigned long query, ...)
     return rc;
 }
 
+/* return an epoll descriptor */
+int pth_waiting_epoll(void) {
+  static int epd = -1;
+#ifndef USE_EPOLL
+  return -1;
+#else
+
+  pth_t t;
+  int fdmax = -1;
+  fd_set rfds, wfds, efds;
+  FD_ZERO(&rfds);
+  FD_ZERO(&wfds);
+  FD_ZERO(&efds);
+  pth_event_t ev, evh;
+
+  for (t = pth_pqueue_head(&pth_WQ); t != NULL;
+       t = pth_pqueue_walk(&pth_WQ, t, PTH_WALK_NEXT)) {
+
+    /* ... and all their events... */
+    if (t->events == NULL)
+      continue;
+    
+    /* ...check whether events occurred */
+    ev = evh = t->events;
+    do {
+      if (ev->ev_status == PTH_STATUS_PENDING) {
+	
+	/* Filedescriptor I/O */
+	if (ev->ev_type == PTH_EVENT_FD) {
+	  /* filedescriptors are checked later all at once.
+	     Here we only assemble them in the fd sets */
+	  if (ev->ev_goal & PTH_UNTIL_FD_READABLE)
+	    FD_SET(ev->ev_args.FD.fd, &rfds);
+	  if (ev->ev_goal & PTH_UNTIL_FD_WRITEABLE)
+	    FD_SET(ev->ev_args.FD.fd, &wfds);
+	  if (ev->ev_goal & PTH_UNTIL_FD_EXCEPTION)
+	    FD_SET(ev->ev_args.FD.fd, &efds);
+	  if (fdmax < ev->ev_args.FD.fd)
+	    fdmax = ev->ev_args.FD.fd;
+	}
+	/* Filedescriptor Set Select I/O */
+	else if (ev->ev_type == PTH_EVENT_SELECT) {
+	  /* filedescriptors are checked later all at once.
+	     Here we only merge the fd sets. */
+	  pth_util_fds_merge(ev->ev_args.SELECT.nfd,
+			     ev->ev_args.SELECT.rfds, &rfds,
+			     ev->ev_args.SELECT.wfds, &wfds,
+			     ev->ev_args.SELECT.efds, &efds);
+	  if (fdmax < ev->ev_args.SELECT.nfd-1)
+	    fdmax = ev->ev_args.SELECT.nfd-1;
+	}
+      }
+    } while ((ev = ev->ev_next) != evh);
+  }
+
+  int nfds = fdmax + 1;
+  int s;
+
+  if (epd > -1) close(epd);
+  epd = epoll_create1(0);
+
+  for (s = 0; s < nfds; s++) {
+    struct epoll_event evt = {0};
+    evt.data.fd = s;
+    if (FD_ISSET(s, &rfds)) evt.events |= EPOLLIN;
+    if (FD_ISSET(s, &wfds)) evt.events |= EPOLLOUT;
+    if (FD_ISSET(s, &efds)) evt.events |= EPOLLRDHUP;
+    if (evt.events) {
+      fprintf(stderr, "Adding event to descriptor %d [%d]\n", s, evt.events);
+      epoll_ctl(epd, EPOLL_CTL_ADD, s, &evt);
+    }
+  }
+
+  return epd;
+
+#endif
+}
+
 /* create a new thread of execution by spawning a cooperative thread */
 static void pth_spawn_trampoline(void)
 {
