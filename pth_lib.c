@@ -207,6 +207,61 @@ long pth_ctrl(unsigned long query, ...)
     return rc;
 }
 
+/* Find the next timer event among waiting threads */
+struct timeval pth_waiting_timeout(void) {
+    pth_time_t nexttimer_value;
+    pth_t nexttimer_thread, t;
+    pth_event_t ev, evh;
+    pth_time_t snapshot;
+    pth_time_t *now = &snapshot;
+    struct timeval timeout;
+
+    /* initialize next timer */
+    pth_time_set(&nexttimer_value, PTH_TIME_ZERO);
+    nexttimer_thread = NULL;
+
+    /* initialize the snapshot time for bootstrapping the loop */
+    pth_time_set(&snapshot, PTH_TIME_NOW);
+
+    /* for all threads in the waiting queue... */
+    for (t = pth_pqueue_head(&pth_WQ); t != NULL;
+         t = pth_pqueue_walk(&pth_WQ, t, PTH_WALK_NEXT)) {
+	
+	/* ... and all their events... */
+        if (t->events == NULL)
+            continue;
+
+        /* ...check whether events occurred */
+        ev = evh = t->events;
+        do {
+            if (ev->ev_status == PTH_STATUS_PENDING) {
+                /* Timer */
+		if (ev->ev_type == PTH_EVENT_TIME) {
+		    /* remember the timer which will be elapsed next */
+		    if ((nexttimer_thread == NULL) ||
+			pth_time_cmp(&(ev->ev_args.TIME.tv), &nexttimer_value) < 0) {
+			nexttimer_thread = t;
+			pth_time_set(&nexttimer_value, &(ev->ev_args.TIME.tv));
+		    }
+                }
+		/* Custom Event Function */
+                else if (ev->ev_type == PTH_EVENT_FUNC) {
+		    pth_time_t tv;
+		    pth_time_set(&tv, now);
+		    pth_time_add(&tv, &(ev->ev_args.FUNC.tv));
+		    if ((nexttimer_thread == NULL) ||
+			pth_time_cmp(&tv, &nexttimer_value) < 0) {
+			nexttimer_thread = t;
+			pth_time_set(&nexttimer_value, &tv);
+		    }
+                }
+	    }
+        } while ((ev = ev->ev_next) != evh);
+    }
+    pth_time_set(&timeout, &nexttimer_value);
+    return timeout;
+}
+
 /* return an epoll descriptor */
 int pth_waiting_epoll(void) {
   static int epd = -1;
@@ -264,8 +319,11 @@ int pth_waiting_epoll(void) {
 
   int nfds = fdmax + 1;
   int s;
-
   if (epd > -1) close(epd);
+  if (nfds == 0) {
+    epd = -1;
+    return epd;
+  }
   epd = epoll_create1(0);
 
   for (s = 0; s < nfds; s++) {
@@ -275,7 +333,6 @@ int pth_waiting_epoll(void) {
     if (FD_ISSET(s, &wfds)) evt.events |= EPOLLOUT;
     if (FD_ISSET(s, &efds)) evt.events |= EPOLLRDHUP;
     if (evt.events) {
-      fprintf(stderr, "Adding event to descriptor %d [%d]\n", s, evt.events);
       epoll_ctl(epd, EPOLL_CTL_ADD, s, &evt);
     }
   }

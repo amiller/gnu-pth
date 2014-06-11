@@ -196,13 +196,17 @@ intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, s
       if (FD_ISSET(s, wfds)) evt.events |= EPOLLOUT;
     if (efds != NULL)
       if (FD_ISSET(s, efds)) evt.events |= EPOLLRDHUP;
-    if (evt.events) epoll_ctl(epd, EPOLL_CTL_ADD, s, &evt);
+    if (evt.events) {
+      printf("concerned about fd:%d\n", s);
+      int rc = epoll_ctl(epd, EPOLL_CTL_ADD, s, &evt);
+      printf("epoll_ctl returned:%d error:%s\n", rc,  strerror(errno));
+    }
   }
   struct epoll_event events[FD_SETSIZE*3];
   int msdelay;
   if (timeout) msdelay = timeout->tv_sec*1000 + (timeout->tv_usec+999)/1000;
   else msdelay = -1;
-  printf("about to epoll for %dms\n", msdelay);
+  printf("about to epoll for %dms on desc:%d\n", msdelay, epd);
   while ((rc = epoll_wait(epd, &events, FD_SETSIZE, msdelay)) < 0
 	 && errno == EINTR) ;
   if (rfds != NULL) FD_ZERO(rfds);
@@ -219,6 +223,7 @@ intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, s
       FD_SET(events[i].data.fd, efds);
   }
   close(epd);
+  printf("just closed %d\n", epd);
   return rc;
 #else
   return pth_sc(select)(nfds, rfds, wfds, efds, timeout);

@@ -422,6 +422,7 @@ extern int            pth_init(void);
 extern int            pth_kill(void);
 extern long           pth_ctrl(unsigned long, ...);
 extern int            pth_waiting_epoll(void);
+extern struct timeval pth_waiting_timeout(void);
 extern long           pth_version(void);
 
     /* thread attribute functions */
