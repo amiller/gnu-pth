@@ -34,6 +34,8 @@
  * size_t, etc) can lead to a compile-time failure (although run-time
  * would be ok). Hence protect ourself from this situation.
  */
+#define _GNU_SOURCE
+
 #define fork          __pth_sys_fork
 #define waitpid       __pth_sys_waitpid
 #define system        __pth_sys_system
@@ -66,20 +68,25 @@ int pth_syscall_soft = PTH_SYSCALL_SOFT;
 int pth_syscall_hard = PTH_SYSCALL_HARD;
 
 #if cpp
-#if PTH_SYSCALL_HARD
-/* hard syscall mapping */
-#if HAVE_SYS_SYSCALL_H
-#include <sys/syscall.h>
-#endif
-#ifdef HAVE_SYS_SOCKETCALL_H
-#include <sys/socketcall.h>
-#endif
-#define pth_sc(func) pth_sc_##func
-#else /* !PTH_SYSCALL_HARD */
-/* no hard syscall mapping */
+//#define pth_sc(func) shd_dl_##func
 #define pth_sc(func) func
-#endif /* PTH_SYSCALL_HARD */
 #endif /* cpp */
+
+
+/* #elif PTH_SYSCALL_HARD */
+/* /\* hard syscall mapping *\/ */
+/* #if HAVE_SYS_SYSCALL_H */
+/* #include <sys/syscall.h> */
+/* #endif */
+/* #ifdef HAVE_SYS_SOCKETCALL_H */
+/* #include <sys/socketcall.h> */
+/* #endif */
+/* #define pth_sc(func) pth_sc_##func */
+/* #else /\* !PTH_SYSCALL_HARD *\/ */
+/* /\* no hard syscall mapping *\/ */
+/* #define pth_sc(func) func */
+/* #endif /\* PTH_SYSCALL_HARD *\/ */
+
 
 /*
  * Unprotect us from the namespace conflict with the
@@ -275,6 +282,7 @@ intern void pth_syscall_kill(void)
 #endif
     return;
 }
+
 
 #if PTH_SYSCALL_HARD
 
