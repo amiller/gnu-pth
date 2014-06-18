@@ -68,8 +68,9 @@ int pth_syscall_soft = PTH_SYSCALL_SOFT;
 int pth_syscall_hard = PTH_SYSCALL_HARD;
 
 #if cpp
-//#define pth_sc(func) shd_dl_##func
-#define pth_sc(func) func
+#define pth_sc(func) shd_dl_##func
+//#define pth_sc(func) func
+
 #endif /* cpp */
 
 
