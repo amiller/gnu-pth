@@ -29,6 +29,9 @@
                                             -- Unknown                */
 #include "pth_p.h"
 
+int pth_shadow_enter() { return -1; }
+void pth_shadow_leave(int ctx) { }
+
 /* return the hexadecimal Pth library version number */
 long pth_version(void)
 {
@@ -63,7 +66,7 @@ int pth_init(void)
     /* support for implicit initialization calls
        and to prevent multiple explict initialization, too */
     if (pth_initialized)
-        return pth_error(FALSE, EPERM);
+        return EPERM;
     else
         pth_initialized = TRUE;
 
@@ -128,7 +131,9 @@ int pth_init(void)
      * function to find the scheduler.
      */
     pth_current = pth_sched;
+    int ctx = pth_shadow_enter();
     pth_mctx_switch(&pth_main->mctx, &pth_sched->mctx);
+    pth_shadow_leave(ctx);
 
     /* came back, so let's go home... */
     pth_debug1("pth_init: leave");
@@ -584,7 +589,9 @@ void pth_exit(void *value)
         pth_current->join_arg = value;
         pth_current->state = PTH_STATE_DEAD;
         pth_debug2("pth_exit: switching from thread \"%s\" to scheduler", pth_current->name);
+	int ctx = pth_shadow_enter();
         pth_mctx_switch(&pth_current->mctx, &pth_sched->mctx);
+	pth_shadow_leave(ctx);
     }
     else {
         /*
@@ -657,12 +664,15 @@ int pth_yield(pth_t to)
                    "in favour of thread \"%s\"", to->name);
     else
         pth_debug1("pth_yield: give up control to scheduler");
+    int ctx = pth_shadow_enter();
     pth_mctx_switch(&pth_current->mctx, &pth_sched->mctx);
+    pth_shadow_leave(ctx);
     pth_debug1("pth_yield: got back control from scheduler");
 
     pth_debug2("pth_yield: leave to thread \"%s\"", pth_current->name);
     return TRUE;
 }
+
 
 /* suspend a thread until its again manually resumed */
 int pth_suspend(pth_t t)

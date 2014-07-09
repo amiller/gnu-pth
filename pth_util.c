@@ -26,6 +26,7 @@
                                   the root of all evil.''
                                              -- D.E.Knuth */
 #include "pth_p.h"
+#include <assert.h>
 
 /* calculate numerical mimimum */
 #if cpp
@@ -197,23 +198,24 @@ intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, s
     if (efds != NULL)
       if (FD_ISSET(s, efds)) evt.events |= EPOLLRDHUP;
     if (evt.events) {
-      printf("concerned about fd:%d\n", s);
+      pth_debug2("concerned about fd:%d", s);
       int rc = epoll_ctl(epd, EPOLL_CTL_ADD, s, &evt);
-      printf("epoll_ctl returned:%d error:%s\n", rc,  strerror(errno));
+      //assert(!rc);
+      pth_debug3("epoll_ctl returned:%d error:%s", rc,  strerror(errno));
     }
   }
   struct epoll_event events[FD_SETSIZE*3];
   int msdelay;
   if (timeout) msdelay = timeout->tv_sec*1000 + (timeout->tv_usec+999)/1000;
   else msdelay = -1;
-  printf("about to epoll for %dms on desc:%d\n", msdelay, epd);
+  pth_debug3("about to epoll for %dms on desc:%d", msdelay, epd);
   while ((rc = epoll_wait(epd, &events, FD_SETSIZE, msdelay)) < 0
 	 && errno == EINTR) ;
   if (rfds != NULL) FD_ZERO(rfds);
   if (wfds != NULL) FD_ZERO(wfds);
   if (efds != NULL) FD_ZERO(efds);
   int i;
-  printf("epoll waited:%dms and returned:%d errno:%s\n", msdelay, rc, strerror(errno));
+  pth_debug4("epoll waited:%dms and returned:%d errno:%s", msdelay, rc, strerror(errno));
   for (i = 0; i < rc; i++) {
     if (rfds != NULL && events[i].events & EPOLLIN)
       FD_SET(events[i].data.fd, rfds);
@@ -223,7 +225,7 @@ intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, s
       FD_SET(events[i].data.fd, efds);
   }
   close(epd);
-  printf("just closed %d\n", epd);
+  pth_debug2("just closed %d", epd);
   return rc;
 #else
   return pth_sc(select)(nfds, rfds, wfds, efds, timeout);
