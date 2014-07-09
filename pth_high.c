@@ -315,8 +315,7 @@ int pth_select_ev(int nfd, fd_set *rfds, fd_set *wfds,
 
     /* first deal with the special situation of a plain microsecond delay */
     if (nfd == 0 && rfds == NULL && wfds == NULL && efds == NULL && timeout != NULL) {
-        if (timeout->tv_sec == 0 && timeout->tv_usec <= 10000 /* 1/100 second */) {
-            /* very small delays are acceptable to be performed directly */
+        if (timeout->tv_sec == 0 && timeout->tv_usec == 0) {
             while (   pth_util_select(0, NULL, NULL, NULL, timeout) < 0
                    && errno == EINTR) ;
         }

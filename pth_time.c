@@ -56,9 +56,9 @@ intern void pth_time_usleep(unsigned long usec)
 /* calculate: t1 = t2 */
 #if cpp
 #if defined(HAVE_GETTIMEOFDAY_ARGS1)
-#define __gettimeofday(t) gettimeofday(t)
+#define __gettimeofday(t) shd_dl_gettimeofday(t)
 #else
-#define __gettimeofday(t) gettimeofday(t, NULL)
+#define __gettimeofday(t) shd_dl_gettimeofday(t, NULL)
 #endif
 #define pth_time_set(t1,t2) \
     do { \
