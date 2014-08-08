@@ -104,6 +104,9 @@ intern const char *pth_state_names[] = {
 #define SIGSTKSZ 8192
 #endif
 
+#undef SIGSTKSZ
+#define SIGSTKSZ 130000
+
 /* allocate a thread control block */
 intern pth_t pth_tcb_alloc(unsigned int stacksize, void *stackaddr)
 {

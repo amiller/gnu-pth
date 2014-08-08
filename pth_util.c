@@ -183,7 +183,9 @@ intern int pth_util_fds_select(int nfd,
     return n;
 }
 
-intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval *timeout) {
+/* pth util select */
+int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval *timeout)
+{
 #ifdef USE_EPOLL
   register int s;
   int epd = epoll_create1(0);
@@ -209,7 +211,7 @@ intern int pth_util_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds, s
   if (timeout) msdelay = timeout->tv_sec*1000 + (timeout->tv_usec+999)/1000;
   else msdelay = -1;
   pth_debug3("about to epoll for %dms on desc:%d", msdelay, epd);
-  while ((rc = epoll_wait(epd, &events, FD_SETSIZE, msdelay)) < 0
+  while ((rc = epoll_wait(epd, events, FD_SETSIZE, msdelay)) < 0
 	 && errno == EINTR) ;
   if (rfds != NULL) FD_ZERO(rfds);
   if (wfds != NULL) FD_ZERO(wfds);
